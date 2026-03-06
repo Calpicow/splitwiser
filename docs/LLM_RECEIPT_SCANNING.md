@@ -102,6 +102,20 @@ System prompt rules:
 - `frontend/src/hooks/useBoundingBoxes.ts`
 - `frontend/src/utils/imagePreprocessing.ts`
 
+## Deployment
+
+Receipt scanning requires an LLM API key. Set via Fly.io secrets:
+
+```bash
+# OpenAI (default provider):
+fly secrets set OPENAI_API_KEY=sk-your-key-here
+
+# Or Gemini:
+fly secrets set GEMINI_API_KEY=your-key-here LLM_PROVIDER=gemini
+```
+
+No code changes needed — the backend reads these from environment variables at runtime. Without a key set, the `/ocr/scan-receipt` endpoint will return an error when called.
+
 ## Known Limitations
 
 - LLM accuracy: tax amounts can be off by a few cents, complex discount layouts may not always be parsed perfectly

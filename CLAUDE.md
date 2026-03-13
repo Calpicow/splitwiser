@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Splitwiser is a Splitwise clone for expense splitting among friends and groups. Key features: multi-currency support (USD, EUR, GBP, JPY, CAD, CNY, HKD, CHF), various split types (equal, exact, percentage, shares, itemized), two-phase OCR receipt scanning, debt simplification, guest/member management, dark mode, refresh token auth, email notifications via Brevo, PWA with offline support, and mobile-optimized UI.
+Splitwiser is a Splitwise clone for expense splitting among friends and groups. Key features: multi-currency support (USD, EUR, GBP, JPY, CAD, CNY, HKD, CHF), various split types (equal, exact, percentage, shares, itemized), LLM-based receipt scanning, debt simplification, guest/member management, dark mode, refresh token auth, email notifications via Brevo, PWA with offline support, and mobile-optimized UI.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ Splitwiser is a Splitwise clone for expense splitting among friends and groups. 
 - `backend/routers/expenses.py` - Expense CRUD, split calculations
 - `backend/routers/balances.py` - Balance calculations, debt simplification
 - `backend/routers/friends.py` - Friend management, friend request emails
-- `backend/routers/ocr.py` - Two-phase OCR (region detection, text extraction)
+- `backend/routers/ocr.py` - LLM-based receipt scanning endpoint
 
 **Utilities:**
 - `backend/utils/currency.py` - Exchange rate fetching (Frankfurter API), caching
@@ -34,11 +34,8 @@ Splitwiser is a Splitwise clone for expense splitting among friends and groups. 
 - `backend/utils/display.py` - Display name helpers for guests and claimed users
 - `backend/utils/email.py` - Brevo API email service for transactional emails
 
-**OCR Integration:**
-- `backend/ocr/service.py` - Google Cloud Vision API client (singleton)
-- `backend/ocr/parser.py` - Receipt text parsing and item extraction (V1)
-- `backend/ocr/parser_v2.py` - Enhanced spatial layout parser with improved accuracy
-- `backend/ocr/regions.py` - Smart region detection and filtering for two-phase OCR (V3)
+**Receipt Scanning:**
+- `backend/ocr/llm_service.py` - OpenAI GPT-4o vision-based receipt parsing with structured output
 
 **Database Migrations:**
 - `backend/migrations/` - Migration scripts with helper tools
@@ -64,14 +61,11 @@ Splitwiser is a Splitwise clone for expense splitting among friends and groups. 
 - `frontend/src/utils/expenseCalculations.ts` - Frontend split calculations
 
 **Feature Components:**
-- `frontend/src/ReceiptScanner.tsx` - Two-phase OCR receipt scanning (V3)
-- `frontend/src/components/expense/BoundingBoxEditor.tsx` - Interactive bounding box editor
-- `frontend/src/components/expense/ItemPreviewEditor.tsx` - Item review and editing interface
+- `frontend/src/ReceiptScanner.tsx` - LLM-based receipt scanning (upload → AI scan → review items)
 - `frontend/src/components/expense/ExpenseItemList.tsx` - Itemized expense UI with per-item splits
 - `frontend/src/ManageGuestModal.tsx` - Guest management and balance aggregation
 - `frontend/src/ManageMemberModal.tsx` - Member management for registered users
 - `frontend/src/hooks/useItemizedExpense.ts` - Itemized expense state management
-- `frontend/src/hooks/useBoundingBoxes.ts` - Bounding box state management for OCR
 
 **PWA Support:**
 - `frontend/public/manifest.json` - PWA manifest for installable app
@@ -86,7 +80,7 @@ Splitwiser is a Splitwise clone for expense splitting among friends and groups. 
 - Registered members can also be managed for balance aggregation
 - Refresh tokens stored hashed (SHA-256) in database with server-side revocation
 - Itemized expenses use proportional tax/tip distribution
-- Receipt images stored in `backend/receipts/` directory
+- Receipt images stored in `data/receipts/` directory (configurable via `DATA_DIR` env var)
 
 ## Development Commands
 
@@ -164,8 +158,7 @@ ALTER TABLE table_name ADD COLUMN column_name TYPE DEFAULT 'value';
 - `GET /exchange_rates` - Current exchange rates
 
 ### OCR
-- `POST /ocr/detect-regions` - Upload receipt, get detected text regions (Phase 1)
-- `POST /ocr/extract-regions` - Extract text from specific regions (Phase 2)
+- `POST /ocr/scan-receipt` - Upload receipt image, get LLM-extracted items with prices
 
 ## Key Database Fields
 
@@ -183,7 +176,8 @@ ALTER TABLE table_name ADD COLUMN column_name TYPE DEFAULT 'value';
 For more detailed information, see the `docs/` directory:
 - `docs/FEATURES.md` - Currency features, dark mode, balance grouping
 - `docs/AUTHENTICATION.md` - Refresh tokens, email notifications
-- `docs/OCR.md` - Receipt scanning two-phase system
+- `docs/OCR.md` - Receipt scanning system
+- `docs/LLM_RECEIPT_SCANNING.md` - LLM-based receipt scanning implementation plan
 - `docs/USER_MANAGEMENT.md` - Guest/member management, public links
 - `docs/ITEMIZED_EXPENSES.md` - Itemized split algorithm
 - `docs/PWA.md` - Progressive Web App, offline support

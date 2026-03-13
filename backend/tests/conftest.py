@@ -5,10 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
-# Mock Google Cloud Vision before any imports that use it
-mock_vision_client = Mock()
-with patch('google.cloud.vision.ImageAnnotatorClient', return_value=mock_vision_client):
-    from main import app
+from main import app
 
 from database import Base, get_db
 from models import User

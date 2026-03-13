@@ -182,7 +182,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         }
     }, [isOpen, preselectedGroupId, preselectedFriendId, user?.id]);
 
-    const handleScannedItems = (items: { description: string, price: number }[], receiptPath?: string, validationWarning?: string | null) => {
+    const handleScannedItems = (items: { description: string, price: number }[], receiptPath?: string, validationWarning?: string | null, taxCents?: number | null, tipCents?: number | null, totalCents?: number | null) => {
         setScannedItems(items);
         if (receiptPath) setReceiptImagePath(receiptPath);
         setOcrValidationWarning(validationWarning || null);
@@ -195,13 +195,18 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             assignments: []
         }));
 
-        itemizedExpense.setItemizedItems(prev => [...prev, ...newItems]);
+        itemizedExpense.setItemizedItems(newItems);
+        itemizedExpense.setTaxAmount(taxCents != null && taxCents > 0 ? (taxCents / 100).toFixed(2) : '');
+        itemizedExpense.setTipAmount(tipCents != null && tipCents > 0 ? (tipCents / 100).toFixed(2) : '');
+
         setSplitType('ITEMIZED');
 
-        const total = [...itemizedExpense.itemizedItems, ...newItems].reduce((acc, item) => acc + item.price, 0);
-        const tax = Math.round(parseFloat(itemizedExpense.taxAmount || '0') * 100);
-        const tip = Math.round(parseFloat(itemizedExpense.tipAmount || '0') * 100);
-        setAmount(((total + tax + tip) / 100).toFixed(2));
+        if (totalCents != null && totalCents > 0) {
+            setAmount((totalCents / 100).toFixed(2));
+        } else {
+            const itemTotal = newItems.reduce((acc, item) => acc + item.price, 0);
+            setAmount(((itemTotal + (taxCents ?? 0) + (tipCents ?? 0)) / 100).toFixed(2));
+        }
         setDescription("Receipt Scan");
     };
 

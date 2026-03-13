@@ -1,1 +1,1 @@
-# OCR package for receipt scanning using Google Cloud Vision
+# OCR package for receipt scanning using LLM vision

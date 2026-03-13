@@ -18,24 +18,3 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
     -moz-appearance: textfield;
 }
-
-/* Animations for ItemPreviewEditor */
-@keyframes dash {
-    from {
-        stroke-dashoffset: 0;
-    }
-    to {
-        stroke-dashoffset: 24;
-    }
-}
-
-@keyframes pulse-scale {
-    0%, 100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.02);
-        opacity: 0.95;
-    }
-}

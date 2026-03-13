@@ -417,29 +417,21 @@ class UserProfile(BaseModel):
         from_attributes = True
 
 
-# OCR Region Extraction schemas
-class RegionBoundingBox(BaseModel):
-    """Bounding box coordinates for a text region."""
-    x: float
-    y: float
-    width: float
-    height: float
-    confidence: Optional[float] = None
-    text: Optional[str] = None
-
-
-class ExtractRegionsRequest(BaseModel):
-    """Request to extract text from specific regions of a cached OCR response."""
-    cache_key: str
-    regions: list[RegionBoundingBox]
-
-
-class ExtractedItem(BaseModel):
-    """Item extracted from a specific region."""
-    region_id: str
+# OCR / Receipt Scanning schemas
+class ReceiptScanItem(BaseModel):
+    """Single item extracted from a receipt by the LLM."""
     description: str
-    price: int  # In cents
-    text: str  # Raw text from region
+    price: int  # Total line price in cents
+    quantity: int = 1
+
+
+class ReceiptScanResponse(BaseModel):
+    """Response from LLM-based receipt scanning."""
+    items: list[ReceiptScanItem]
+    tax: Optional[int] = None  # Cents
+    tip: Optional[int] = None  # Cents
+    total: Optional[int] = None  # Cents
+    receipt_image_path: str
 
 
 # Google OAuth Schemas

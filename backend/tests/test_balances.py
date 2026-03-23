@@ -21,7 +21,7 @@ def test_simple_balance(client, auth_headers, db_session, test_user):
         "currency": "USD",
         "date": str(date.today()),
         "payer_id": test_user.id,
-        "group_id": None,  # Non-group expense to verify direct balance
+        "group_id": group_id,
         "split_type": "EQUAL",
         "splits": [
             {"user_id": test_user.id, "amount_owed": 1000, "is_guest": False},
@@ -30,20 +30,17 @@ def test_simple_balance(client, auth_headers, db_session, test_user):
     }
     client.post("/expenses/", headers=auth_headers, json=payload)
 
-    # Check Balances
+    # Check Balances - the /balances endpoint returns group-level balances
+    # Each entry has group_name, group_id, and the user's net balance in that group
     response = client.get("/balances/", headers=auth_headers)
     assert response.status_code == 200
     balances = response.json()["balances"]
-    
-    # Filter for our specific users/group if necessary, but in test db this should be clear
-    # We expect Other User to owe Test User
-    other_balance = next((b for b in balances if b["user_id"] == other_user.id), None)
-    assert other_balance is not None
-    # Amount is positive if WE are owed, negative if WE owe.
-    # Here, Test User (requester) paid for Other User, so Test User is owed.
-    # Wait, the balance endpoint usually returns a list of balances *relative to the current user*.
-    # If "amount" is positive, it means that user owes ME.
-    assert other_balance["amount"] == 1000.0
+
+    # The /balances endpoint returns one entry per group with the current user's net balance.
+    # Test User paid 2000 and owes 1000, so net is +1000 (owed by group).
+    group_balance = next((b for b in balances if b["group_id"] == group_id), None)
+    assert group_balance is not None
+    assert group_balance["amount"] == 1000.0
 
 def test_settlement(client, auth_headers, db_session, test_user):
     # Setup as above

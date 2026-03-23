@@ -96,120 +96,120 @@ Three parallel workstreams:
 ## Implementation Steps
 
 ### Step 1: Backend — Expense Update Integration Tests
-- [ ] Create `backend/tests/test_expense_update.py`
-- [ ] Test: Update expense with EQUAL split — change amount, verify splits recalculated
-- [ ] Test: Update expense with EXACT split — change individual amounts
-- [ ] Test: Update expense with PERCENTAGE split — change percentages
-- [ ] Test: Update expense with SHARES split — change share counts
-- [ ] Test: Update ITEMIZED expense — change items, verify splits recalculated from assignments
-- [ ] Test: Update ITEMIZED expense — add/remove items
-- [ ] Test: Update ITEMIZED expense with tax/tip items — verify proportional distribution
-- [ ] Test: Change split type (EQUAL → EXACT, EQUAL → ITEMIZED, ITEMIZED → EQUAL)
-- [ ] Test: Change payer on update
-- [ ] Test: Change payer to guest on update
-- [ ] Test: Change currency on update — verify exchange rate re-fetched
-- [ ] Test: Change date on update — verify exchange rate re-fetched
-- [ ] Test: Update expense with group guest participants
-- [ ] Test: Update ITEMIZED expense with group guest assignments
-- [ ] Test: Verify unauthorized user cannot update another user's expense
-- [ ] Test: Verify updating non-existent expense returns 404
+- [x] Create `backend/tests/test_expense_update.py`
+- [x] Test: Update expense with EQUAL split — change amount, verify splits recalculated
+- [x] Test: Update expense with EXACT split — change individual amounts
+- [x] Test: Update expense with PERCENTAGE split — change percentages
+- [x] Test: Update expense with SHARES split — change share counts
+- [x] Test: Update ITEMIZED expense — change items, verify splits recalculated from assignments
+- [x] Test: Update ITEMIZED expense — add/remove items
+- [x] Test: Update ITEMIZED expense with tax/tip items — verify proportional distribution
+- [x] Test: Change split type (EQUAL → EXACT, EQUAL → ITEMIZED, ITEMIZED → EQUAL)
+- [x] Test: Change payer on update
+- [x] Test: Change payer to guest on update
+- [x] Test: Change currency on update — verify exchange rate re-fetched
+- [x] Test: Change date on update — verify exchange rate re-fetched
+- [x] Test: Update expense with group guest participants
+- [x] Test: Update ITEMIZED expense with group guest assignments
+- [x] Test: Verify unauthorized user cannot update another user's expense
+- [x] Test: Verify updating non-existent expense returns 404
 
 ### Step 2: Frontend — Install Vitest and Configure
-- [ ] Add vitest, @testing-library/react, @testing-library/react-hooks, jsdom to devDependencies in `frontend/package.json`
-- [ ] Add test config to `frontend/vite.config.ts` (or create `frontend/vitest.config.ts`)
-- [ ] Add `"test": "vitest"` script to `frontend/package.json`
-- [ ] Verify `npx vitest --run` works with an empty test
+- [x] Add vitest, @testing-library/react, @testing-library/react-hooks, jsdom to devDependencies in `frontend/package.json`
+- [x] Add test config to `frontend/vite.config.ts` (or create `frontend/vitest.config.ts`)
+- [x] Add `"test": "vitest"` script to `frontend/package.json`
+- [x] Verify `npx vitest --run` works with an empty test
 
 ### Step 3: Frontend — Unit Tests for expenseCalculations.ts
-- [ ] Create `frontend/src/utils/__tests__/expenseCalculations.test.ts`
-- [ ] Test: calculateEqualSplit — even division (no remainder)
-- [ ] Test: calculateEqualSplit — uneven division (remainder assigned to first participant)
-- [ ] Test: calculateEqualSplit — single participant gets full amount
-- [ ] Test: calculateEqualSplit — with guest participants (isGuest flag preserved)
-- [ ] Test: calculateExactSplit — amounts sum to total (valid)
-- [ ] Test: calculateExactSplit — amounts don't sum to total (returns error)
-- [ ] Test: calculateExactSplit — tolerance of 1 cent
-- [ ] Test: calculateExactSplit — missing splitDetails key defaults to 0
-- [ ] Test: calculatePercentSplit — equal percentages
-- [ ] Test: calculatePercentSplit — percentages don't sum to 100 (returns error)
-- [ ] Test: calculatePercentSplit — last participant gets remainder (rounding)
-- [ ] Test: calculateSharesSplit — equal shares
-- [ ] Test: calculateSharesSplit — unequal shares
-- [ ] Test: calculateSharesSplit — zero total shares (returns error)
-- [ ] Test: calculateSharesSplit — last participant gets remainder
-- [ ] Test: calculateItemizedTotal — items + tax + tip
-- [ ] Test: calculateItemizedTotal — empty tax/tip strings treated as 0
+- [x] Create `frontend/src/utils/__tests__/expenseCalculations.test.ts`
+- [x] Test: calculateEqualSplit — even division (no remainder)
+- [x] Test: calculateEqualSplit — uneven division (remainder assigned to first participant)
+- [x] Test: calculateEqualSplit — single participant gets full amount
+- [x] Test: calculateEqualSplit — with guest participants (isGuest flag preserved)
+- [x] Test: calculateExactSplit — amounts sum to total (valid)
+- [x] Test: calculateExactSplit — amounts don't sum to total (returns error)
+- [x] Test: calculateExactSplit — tolerance of 1 cent
+- [x] Test: calculateExactSplit — missing splitDetails key defaults to 0
+- [x] Test: calculatePercentSplit — equal percentages
+- [x] Test: calculatePercentSplit — percentages don't sum to 100 (returns error)
+- [x] Test: calculatePercentSplit — last participant gets remainder (rounding)
+- [x] Test: calculateSharesSplit — equal shares
+- [x] Test: calculateSharesSplit — unequal shares
+- [x] Test: calculateSharesSplit — zero total shares (returns error)
+- [x] Test: calculateSharesSplit — last participant gets remainder
+- [x] Test: calculateItemizedTotal — items + tax + tip
+- [x] Test: calculateItemizedTotal — empty tax/tip strings treated as 0
 
 ### Step 4: Frontend — Extract Data Transformation Functions
-- [ ] Create `frontend/src/utils/expenseTransformations.ts`
-- [ ] Extract `parseParticipantKey(key: string) → { type: 'user' | 'guest' | 'expenseguest', id: number }`
-- [ ] Extract `buildParticipantKey(type, id) → string`
-- [ ] Extract `extractParticipantKeysFromExpense(expense: ExpenseWithSplits) → string[]`
-- [ ] Extract `extractSplitDetailsFromExpense(expense: ExpenseWithSplits) → Record<string, number>`
-- [ ] Extract `extractItemizedDataFromExpense(expense: ExpenseWithSplits) → { items: ExpenseItem[], taxAmount: string, tipAmount: string }`
-- [ ] Extract `assembleItemizedPayload(items: ExpenseItem[], taxAmount: string, tipAmount: string) → { items: ExpenseItem[], totalCents: number }`
-- [ ] Extract `assembleSplitsPayload(splitType, participants, splitDetails, totalAmountCents) → SplitResult[]`
-- [ ] Extract `amountToCents(amount: string) → number` and `centsToDisplayAmount(cents: number) → string`
-- [ ] Update `ExpenseDetailModal.tsx` to import and use extracted functions
-- [ ] Update `AddExpenseModal.tsx` to import and use extracted functions
-- [ ] Verify the app still works (manual smoke test or existing behavior unchanged)
+- [x] Create `frontend/src/utils/expenseTransformations.ts`
+- [x] Extract `parseParticipantKey(key: string) → { type: 'user' | 'guest' | 'expenseguest', id: number }`
+- [x] Extract `buildParticipantKey(type, id) → string`
+- [x] Extract `extractParticipantKeysFromExpense(expense: ExpenseWithSplits) → string[]`
+- [x] Extract `extractSplitDetailsFromExpense(expense: ExpenseWithSplits) → Record<string, number>`
+- [x] Extract `extractItemizedDataFromExpense(expense: ExpenseWithSplits) → { items: ExpenseItem[], taxAmount: string, tipAmount: string }`
+- [x] Extract `assembleItemizedPayload(items: ExpenseItem[], taxAmount: string, tipAmount: string) → { items: ExpenseItem[], totalCents: number }`
+- [x] Extract `assembleSplitsPayload(splitType, participants, splitDetails, totalAmountCents) → SplitResult[]`
+- [x] Extract `amountToCents(amount: string) → number` and `centsToDisplayAmount(cents: number) → string`
+- [x] Update `ExpenseDetailModal.tsx` to import and use extracted functions
+- [x] Update `AddExpenseModal.tsx` to import and use extracted functions
+- [x] Verify the app still works (manual smoke test or existing behavior unchanged)
 
 ### Step 5: Frontend — Unit Tests for expenseTransformations.ts
-- [ ] Create `frontend/src/utils/__tests__/expenseTransformations.test.ts`
-- [ ] Test: parseParticipantKey — "user_5" → { type: 'user', id: 5 }
-- [ ] Test: parseParticipantKey — "guest_3" → { type: 'guest', id: 3 }
-- [ ] Test: parseParticipantKey — "expenseguest_12" → { type: 'expenseguest', id: 12 }
-- [ ] Test: buildParticipantKey — round-trips with parseParticipantKey
-- [ ] Test: extractParticipantKeysFromExpense — with splits + expense guests
-- [ ] Test: extractSplitDetailsFromExpense — PERCENTAGE split → { "user_5": 60, "guest_3": 40 }
-- [ ] Test: extractSplitDetailsFromExpense — SHARES split
-- [ ] Test: extractSplitDetailsFromExpense — EXACT split (amount_owed in dollars)
-- [ ] Test: extractItemizedDataFromExpense — separates regular items from tax/tip
-- [ ] Test: extractItemizedDataFromExpense — handles combined "Tax/Tip" item
-- [ ] Test: extractItemizedDataFromExpense — no tax/tip items → empty strings
-- [ ] Test: extractItemizedDataFromExpense — preserves expense_guest_id in assignments
-- [ ] Test: assembleItemizedPayload — appends tax item when > 0
-- [ ] Test: assembleItemizedPayload — appends tip item when > 0
-- [ ] Test: assembleItemizedPayload — skips tax/tip when 0 or empty string
-- [ ] Test: assembleItemizedPayload — calculates correct totalCents
-- [ ] Test: assembleSplitsPayload — EQUAL split delegates to calculateEqualSplit
-- [ ] Test: assembleSplitsPayload — filters out expense guest participants
-- [ ] Test: amountToCents — "12.50" → 1250
-- [ ] Test: amountToCents — "0.01" → 1 (no floating point error)
-- [ ] Test: centsToDisplayAmount — 1250 → "12.50"
-- [ ] Test: Round-trip: load expense → extract data → reassemble payload → compare with original API shape (the critical integration test)
-- [ ] Test: Round-trip with itemized expense + tax + tip
-- [ ] Test: Round-trip with expense guests in itemized assignments
+- [x] Create `frontend/src/utils/__tests__/expenseTransformations.test.ts`
+- [x] Test: parseParticipantKey — "user_5" → { type: 'user', id: 5 }
+- [x] Test: parseParticipantKey — "guest_3" → { type: 'guest', id: 3 }
+- [x] Test: parseParticipantKey — "expenseguest_12" → { type: 'expenseguest', id: 12 }
+- [x] Test: buildParticipantKey — round-trips with parseParticipantKey
+- [x] Test: extractParticipantKeysFromExpense — with splits + expense guests
+- [x] Test: extractSplitDetailsFromExpense — PERCENTAGE split → { "user_5": 60, "guest_3": 40 }
+- [x] Test: extractSplitDetailsFromExpense — SHARES split
+- [x] Test: extractSplitDetailsFromExpense — EXACT split (amount_owed in dollars)
+- [x] Test: extractItemizedDataFromExpense — separates regular items from tax/tip
+- [x] Test: extractItemizedDataFromExpense — handles combined "Tax/Tip" item
+- [x] Test: extractItemizedDataFromExpense — no tax/tip items → empty strings
+- [x] Test: extractItemizedDataFromExpense — preserves expense_guest_id in assignments
+- [x] Test: assembleItemizedPayload — appends tax item when > 0
+- [x] Test: assembleItemizedPayload — appends tip item when > 0
+- [x] Test: assembleItemizedPayload — skips tax/tip when 0 or empty string
+- [x] Test: assembleItemizedPayload — calculates correct totalCents
+- [x] Test: assembleSplitsPayload — EQUAL split delegates to calculateEqualSplit
+- [x] Test: assembleSplitsPayload — filters out expense guest participants
+- [x] Test: amountToCents — "12.50" → 1250
+- [x] Test: amountToCents — "0.01" → 1 (no floating point error)
+- [x] Test: centsToDisplayAmount — 1250 → "12.50"
+- [x] Test: Round-trip: load expense → extract data → reassemble payload → compare with original API shape (the critical integration test)
+- [x] Test: Round-trip with itemized expense + tax + tip
+- [x] Test: Round-trip with expense guests in itemized assignments
 
 ### Step 6: Frontend — Unit Tests for useItemizedExpense Hook
-- [ ] Create `frontend/src/hooks/__tests__/useItemizedExpense.test.ts`
-- [ ] Test: Initial state — empty items, empty tax/tip
-- [ ] Test: addManualItem — adds item with correct defaults (is_tax_tip: false, empty assignments, split_type: 'EQUAL')
-- [ ] Test: removeItem — removes by index, preserves others
-- [ ] Test: toggleItemAssignment — adds participant to item
-- [ ] Test: toggleItemAssignment — removes existing participant from item
-- [ ] Test: toggleItemAssignment — expense guest uses expense_guest_id matching
-- [ ] Test: toggleItemAssignment — regular guest uses user_id + is_guest matching
-- [ ] Test: changeSplitType — EQUAL to SHARES initializes shares: 1 for each assignee
-- [ ] Test: changeSplitType — EQUAL to PERCENT initializes equal percentages
-- [ ] Test: changeSplitType — EQUAL to EXACT initializes equal amounts
-- [ ] Test: changeSplitType — preserves existing split_details when switching
-- [ ] Test: updateSplitDetail — updates specific participant's detail
-- [ ] Test: setTipFromPercentage — 20% of $50 subtotal = $10.00
-- [ ] Test: getSubtotalCents — sums item prices correctly
+- [x] Create `frontend/src/hooks/__tests__/useItemizedExpense.test.ts`
+- [x] Test: Initial state — empty items, empty tax/tip
+- [x] Test: addManualItem — adds item with correct defaults (is_tax_tip: false, empty assignments, split_type: 'EQUAL')
+- [x] Test: removeItem — removes by index, preserves others
+- [x] Test: toggleItemAssignment — adds participant to item
+- [x] Test: toggleItemAssignment — removes existing participant from item
+- [x] Test: toggleItemAssignment — expense guest uses expense_guest_id matching
+- [x] Test: toggleItemAssignment — regular guest uses user_id + is_guest matching
+- [x] Test: changeSplitType — EQUAL to SHARES initializes shares: 1 for each assignee
+- [x] Test: changeSplitType — EQUAL to PERCENT initializes equal percentages
+- [x] Test: changeSplitType — EQUAL to EXACT initializes equal amounts
+- [x] Test: changeSplitType — preserves existing split_details when switching
+- [x] Test: updateSplitDetail — updates specific participant's detail
+- [x] Test: setTipFromPercentage — 20% of $50 subtotal = $10.00
+- [x] Test: getSubtotalCents — sums item prices correctly
 
 ## Acceptance Criteria
-- [ ] [test] All 5 split types tested for expense updates (EQUAL, EXACT, PERCENT, SHARES, ITEMIZED)
-- [ ] [test] Split type change on update tested (at least 3 transitions)
-- [ ] [test] Payer change on update tested (regular user and guest)
-- [ ] [test] Currency/date change triggers exchange rate update
-- [ ] [test] Itemized expense update with guest assignments tested
-- [ ] [test] All 5 frontend split calculation functions have full coverage (happy path + error cases + edge cases)
-- [ ] [test] Itemized expense hook state management tested (add, remove, toggle, split type change)
-- [ ] [test] Data transformation round-trip tested: API response → form state → API payload preserves data integrity
-- [ ] [test] Tax/tip extraction and reassembly tested
-- [ ] [test] Expense guest assignment preservation tested through load/save cycle
-- [ ] [test] `npm run test` passes in frontend, `pytest` passes in backend
+- [x] [test] All 5 split types tested for expense updates (EQUAL, EXACT, PERCENT, SHARES, ITEMIZED)
+- [x] [test] Split type change on update tested (at least 3 transitions)
+- [x] [test] Payer change on update tested (regular user and guest)
+- [x] [test] Currency/date change triggers exchange rate update
+- [x] [test] Itemized expense update with guest assignments tested
+- [x] [test] All 5 frontend split calculation functions have full coverage (happy path + error cases + edge cases)
+- [x] [test] Itemized expense hook state management tested (add, remove, toggle, split type change)
+- [x] [test] Data transformation round-trip tested: API response → form state → API payload preserves data integrity
+- [x] [test] Tax/tip extraction and reassembly tested
+- [x] [test] Expense guest assignment preservation tested through load/save cycle
+- [x] [test] `npm run test` passes in frontend, `pytest` passes in backend
 - [ ] [test-manual] Edit an itemized expense with tax, tip, and guest assignments in the UI — verify amounts are correct after save
 
 ## Edge Cases

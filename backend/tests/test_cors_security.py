@@ -1,11 +1,36 @@
 import os
+import importlib
+import pytest
 from fastapi.testclient import TestClient
-from main import app  # Changed from backend.main to main since PYTHONPATH=backend
 
-client = TestClient(app)
+
+def _make_app_with_origins(origins_env: str = None):
+    """Create a fresh app instance with the given BACKEND_CORS_ORIGINS."""
+    old = os.environ.get("BACKEND_CORS_ORIGINS")
+    try:
+        if origins_env is not None:
+            os.environ["BACKEND_CORS_ORIGINS"] = origins_env
+        elif "BACKEND_CORS_ORIGINS" in os.environ:
+            del os.environ["BACKEND_CORS_ORIGINS"]
+
+        # Re-import main to pick up the new env
+        import main as main_mod
+        importlib.reload(main_mod)
+        return main_mod.app
+    finally:
+        # Restore original env
+        if old is not None:
+            os.environ["BACKEND_CORS_ORIGINS"] = old
+        elif "BACKEND_CORS_ORIGINS" in os.environ:
+            del os.environ["BACKEND_CORS_ORIGINS"]
+
 
 def test_cors_rejects_evil_origin():
-    """Verify that requests from unauthorized origins do not receive permissive CORS headers."""
+    """Verify that requests from unauthorized origins do not receive permissive CORS headers
+    when BACKEND_CORS_ORIGINS is set (production mode)."""
+    app = _make_app_with_origins("http://localhost:3000")
+    client = TestClient(app)
+
     origin = "http://evil.com"
     headers = {"Origin": origin}
 
@@ -23,9 +48,12 @@ def test_cors_rejects_evil_origin():
     assert acao != origin, "Vulnerability: Arbitrary origin reflected in Access-Control-Allow-Origin"
     assert acao != "*", "Vulnerability: Wildcard origin allowed with credentials"
 
+
 def test_cors_allows_valid_origin():
     """Verify that requests from whitelisted origins receive correct CORS headers."""
-    # Assuming default localhost:3000 is in the whitelist
+    app = _make_app_with_origins("http://localhost:3000")
+    client = TestClient(app)
+
     origin = "http://localhost:3000"
     headers = {"Origin": origin}
 
@@ -40,6 +68,7 @@ def test_cors_allows_valid_origin():
 
     assert acao == origin, "Valid origin was not allowed"
     assert acac == "true", "Credentials not allowed for valid origin"
+
 
 if __name__ == "__main__":
     test_cors_rejects_evil_origin()

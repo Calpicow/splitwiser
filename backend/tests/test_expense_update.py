@@ -1,5 +1,6 @@
 """Comprehensive integration tests for the PUT /expenses/{expense_id} endpoint."""
 
+import pytest
 from datetime import date
 from unittest.mock import patch
 
@@ -912,3 +913,252 @@ def test_update_nonexistent_expense(client, auth_headers, db_session, test_user)
     resp = _update_expense(client, auth_headers, 999999, payload)
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Helpers for non-group expense tests with expense guests
+# ---------------------------------------------------------------------------
+
+def _create_friendship(db_session, user_id1, user_id2):
+    """Create a friendship between two users directly in the DB."""
+    from models import Friendship
+    friendship = Friendship(user_id1=user_id1, user_id2=user_id2)
+    db_session.add(friendship)
+    db_session.commit()
+    return friendship
+
+
+# ---------------------------------------------------------------------------
+# 19. Update ITEMIZED expense with expense guests — recalculate amounts
+# ---------------------------------------------------------------------------
+
+@pytest.mark.xfail(reason="Known bug: update uses calculate_itemized_splits() instead of calculate_itemized_splits_with_expense_guests(), and never updates ExpenseGuest.amount_owed")
+def test_update_itemized_expense_with_expense_guests(client, auth_headers, db_session, test_user):
+    """Create a non-group itemized expense with expense guests, update items,
+    and verify that expense guest amounts are correctly recalculated."""
+    friend = _make_user(db_session, "eg_friend@example.com", "EG Friend")
+    _create_friendship(db_session, test_user.id, friend.id)
+
+    # Create a non-group itemized expense with an expense guest
+    create_payload = {
+        "description": "Dinner with guest",
+        "amount": 3000,  # will be recalculated
+        "currency": "USD",
+        "date": str(date.today()),
+        "payer_id": test_user.id,
+        "group_id": None,
+        "split_type": "ITEMIZED",
+        "splits": [
+            {"user_id": test_user.id, "amount_owed": 0, "is_guest": False},
+            {"user_id": friend.id, "amount_owed": 0, "is_guest": False},
+        ],
+        "expense_guests": [
+            {"temp_id": "g1", "name": "Ad-hoc Guest"},
+        ],
+        "items": [
+            {
+                "description": "Steak",
+                "price": 2000,
+                "is_tax_tip": False,
+                "assignments": [{"user_id": test_user.id, "is_guest": False}],
+            },
+            {
+                "description": "Salad",
+                "price": 800,
+                "is_tax_tip": False,
+                "assignments": [{"temp_guest_id": "g1"}],
+            },
+            {
+                "description": "Soup",
+                "price": 600,
+                "is_tax_tip": False,
+                "assignments": [{"user_id": friend.id, "is_guest": False}],
+            },
+        ],
+    }
+
+    created = _create_expense(client, auth_headers, create_payload)
+    expense_id = created["id"]
+
+    # Verify initial state
+    details = _get_expense(client, auth_headers, expense_id)
+    assert len(details["expense_guests"]) == 1
+    initial_guest = details["expense_guests"][0]
+    assert initial_guest["name"] == "Ad-hoc Guest"
+    assert initial_guest["amount_owed"] == 800  # Salad
+    guest_db_id = initial_guest["id"]
+
+    # Update: change Salad price to 1200, reassign Soup to the expense guest too
+    # Use the expense guest's DB id in user_id (the way frontend sends existing expense guests)
+    update_payload = {
+        "description": "Dinner with guest (updated)",
+        "amount": 3800,  # will be recalculated from items
+        "currency": "USD",
+        "date": str(date.today()),
+        "payer_id": test_user.id,
+        "group_id": None,
+        "split_type": "ITEMIZED",
+        "splits": [
+            {"user_id": test_user.id, "amount_owed": 0, "is_guest": False},
+            {"user_id": friend.id, "amount_owed": 0, "is_guest": False},
+        ],
+        "expense_guests": [
+            {"temp_id": "g1", "name": "Ad-hoc Guest"},
+        ],
+        "items": [
+            {
+                "description": "Steak",
+                "price": 2000,
+                "is_tax_tip": False,
+                "assignments": [{"user_id": test_user.id, "is_guest": False}],
+            },
+            {
+                "description": "Salad",
+                "price": 1200,
+                "is_tax_tip": False,
+                "assignments": [{"user_id": guest_db_id, "is_guest": False}],
+            },
+            {
+                "description": "Soup",
+                "price": 600,
+                "is_tax_tip": False,
+                "assignments": [{"user_id": guest_db_id, "is_guest": False}],
+            },
+        ],
+    }
+
+    resp = _update_expense(client, auth_headers, expense_id, update_payload)
+    assert resp.status_code == 200
+
+    # Verify the expense guest amount was updated
+    updated = _get_expense(client, auth_headers, expense_id)
+    assert len(updated["expense_guests"]) == 1
+    updated_guest = updated["expense_guests"][0]
+    assert updated_guest["id"] == guest_db_id
+    # Expense guest should owe Salad(1200) + Soup(600) = 1800
+    assert updated_guest["amount_owed"] == 1800
+
+    # Verify user splits are also correct
+    splits = {s["user_id"]: s["amount_owed"] for s in updated["splits"]}
+    # test_user should owe Steak(2000)
+    assert splits[test_user.id] == 2000
+    # friend should owe 0 (no items assigned)
+    assert splits[friend.id] == 0
+
+
+# ---------------------------------------------------------------------------
+# 20. Update ITEMIZED expense — expense guest assignments preserved
+# ---------------------------------------------------------------------------
+
+@pytest.mark.xfail(reason="Known bug: expense guest lookup matches by name instead of ID, causing assignments to be silently lost")
+def test_update_itemized_expense_guest_assignments_preserved(client, auth_headers, db_session, test_user):
+    """Create a non-group itemized expense with expense guest item assignments.
+    Update the expense (change a description/price). Verify expense guest item
+    assignments are preserved after update."""
+    friend = _make_user(db_session, "eg_friend2@example.com", "EG Friend2")
+    _create_friendship(db_session, test_user.id, friend.id)
+
+    # Create with two expense guests assigned to items
+    create_payload = {
+        "description": "Brunch with guests",
+        "amount": 2500,
+        "currency": "USD",
+        "date": str(date.today()),
+        "payer_id": test_user.id,
+        "group_id": None,
+        "split_type": "ITEMIZED",
+        "splits": [
+            {"user_id": test_user.id, "amount_owed": 0, "is_guest": False},
+        ],
+        "expense_guests": [
+            {"temp_id": "ga", "name": "Guest Alpha"},
+            {"temp_id": "gb", "name": "Guest Beta"},
+        ],
+        "items": [
+            {
+                "description": "Pancakes",
+                "price": 1000,
+                "is_tax_tip": False,
+                "assignments": [{"temp_guest_id": "ga"}],
+            },
+            {
+                "description": "Waffles",
+                "price": 1500,
+                "is_tax_tip": False,
+                "assignments": [{"temp_guest_id": "gb"}],
+            },
+        ],
+    }
+
+    created = _create_expense(client, auth_headers, create_payload)
+    expense_id = created["id"]
+
+    # Verify initial state
+    details = _get_expense(client, auth_headers, expense_id)
+    guests_by_name = {g["name"]: g for g in details["expense_guests"]}
+    assert guests_by_name["Guest Alpha"]["amount_owed"] == 1000
+    assert guests_by_name["Guest Beta"]["amount_owed"] == 1500
+    alpha_id = guests_by_name["Guest Alpha"]["id"]
+    beta_id = guests_by_name["Guest Beta"]["id"]
+
+    # Verify items have correct expense guest assignments
+    for item in details["items"]:
+        if item["description"] == "Pancakes":
+            assert len(item["assignments"]) == 1
+            assert item["assignments"][0]["expense_guest_id"] == alpha_id
+        elif item["description"] == "Waffles":
+            assert len(item["assignments"]) == 1
+            assert item["assignments"][0]["expense_guest_id"] == beta_id
+
+    # Update: change Pancakes price to 1200, keep same assignments
+    # Use temp_guest_id to reference expense guests (the way the frontend sends them)
+    update_payload = {
+        "description": "Brunch with guests (updated)",
+        "amount": 2700,
+        "currency": "USD",
+        "date": str(date.today()),
+        "payer_id": test_user.id,
+        "group_id": None,
+        "split_type": "ITEMIZED",
+        "splits": [
+            {"user_id": test_user.id, "amount_owed": 0, "is_guest": False},
+        ],
+        "expense_guests": [
+            {"temp_id": "ga", "name": "Guest Alpha"},
+            {"temp_id": "gb", "name": "Guest Beta"},
+        ],
+        "items": [
+            {
+                "description": "Pancakes",
+                "price": 1200,
+                "is_tax_tip": False,
+                "assignments": [{"temp_guest_id": "ga"}],
+            },
+            {
+                "description": "Waffles",
+                "price": 1500,
+                "is_tax_tip": False,
+                "assignments": [{"temp_guest_id": "gb"}],
+            },
+        ],
+    }
+
+    resp = _update_expense(client, auth_headers, expense_id, update_payload)
+    assert resp.status_code == 200
+
+    # Verify expense guest assignments are preserved after update
+    updated = _get_expense(client, auth_headers, expense_id)
+
+    # Check that items still have expense guest assignments
+    for item in updated["items"]:
+        assert len(item["assignments"]) == 1, (
+            f"Item '{item['description']}' should have 1 assignment but has {len(item['assignments'])}"
+        )
+        assert item["assignments"][0]["expense_guest_id"] is not None, (
+            f"Item '{item['description']}' assignment should reference an expense guest"
+        )
+
+    # Verify the specific assignments
+    items_by_desc = {i["description"]: i for i in updated["items"]}
+    assert items_by_desc["Pancakes"]["assignments"][0]["expense_guest_id"] == alpha_id
+    assert items_by_desc["Waffles"]["assignments"][0]["expense_guest_id"] == beta_id

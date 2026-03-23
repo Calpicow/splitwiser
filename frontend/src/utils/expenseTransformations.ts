@@ -263,7 +263,7 @@ export const assembleSplitsPayload = (
  * Convert a display-amount string (e.g. "12.50") to integer cents.
  */
 export const amountToCents = (amount: string): number =>
-    Math.round(parseFloat(amount) * 100);
+    Math.round(parseFloat(amount || '0') * 100);
 
 /**
  * Convert integer cents to a display string with two decimals.

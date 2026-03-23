@@ -429,9 +429,15 @@ describe('amountToCents', () => {
     });
 
     it('"" → 0 (handles empty string)', () => {
-        // parseFloat('') is NaN, Math.round(NaN * 100) is NaN
-        // This documents current behavior
-        expect(amountToCents('0')).toBe(0);
+        expect(amountToCents('')).toBe(0);
+    });
+
+    it('"99.999" → 10000 (rounds correctly)', () => {
+        expect(amountToCents('99.999')).toBe(10000);
+    });
+
+    it('"0.1" → 10', () => {
+        expect(amountToCents('0.1')).toBe(10);
     });
 });
 

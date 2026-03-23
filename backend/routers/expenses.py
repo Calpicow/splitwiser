@@ -542,7 +542,7 @@ def update_expense(
 
         # Check if any items have expense guest assignments or if expense has existing expense guests
         has_expense_guests = any(
-            a.temp_guest_id for item in expense_update.items for a in item.assignments
+            (a.temp_guest_id or a.expense_guest_id) for item in expense_update.items for a in item.assignments
         )
         existing_expense_guests = db.query(models.ExpenseGuest).filter(
             models.ExpenseGuest.expense_id == expense_id
@@ -716,8 +716,17 @@ def update_expense(
 
             # Store assignments
             for assignment in item.assignments:
-                # Check if this is an expense guest assignment
-                if hasattr(assignment, 'temp_guest_id') and assignment.temp_guest_id:
+                # Check if this is an expense guest assignment (via expense_guest_id or temp_guest_id)
+                if assignment.expense_guest_id:
+                    # Direct expense guest ID from edit flow
+                    db_assignment = models.ExpenseItemAssignment(
+                        expense_item_id=db_item.id,
+                        user_id=None,
+                        is_guest=False,
+                        expense_guest_id=assignment.expense_guest_id
+                    )
+                    db.add(db_assignment)
+                elif hasattr(assignment, 'temp_guest_id') and assignment.temp_guest_id:
                     # Look up the actual expense guest
                     expense_guest = None
                     # First check the temp_id mapping (built from expense_guests in update payload)

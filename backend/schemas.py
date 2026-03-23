@@ -57,6 +57,7 @@ class ItemAssignment(BaseModel):
     user_id: Optional[int] = None
     is_guest: bool = False
     temp_guest_id: Optional[str] = None  # For ad-hoc expense guests (references temp_id)
+    expense_guest_id: Optional[int] = None  # For existing expense guests (from edit flow)
 
 class ItemSplitDetail(BaseModel):
     amount: Optional[int] = None  # For EXACT split (in cents)

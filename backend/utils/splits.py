@@ -8,6 +8,8 @@ def get_assignment_key(assignment: schemas.ItemAssignment) -> str:
     """Get a unique key for an assignment (user, group guest, or expense guest)."""
     if assignment.temp_guest_id:
         return f"expense_guest_{assignment.temp_guest_id}"
+    elif assignment.expense_guest_id:
+        return f"expense_guest_{assignment.expense_guest_id}"
     elif assignment.is_guest:
         return f"guest_{assignment.user_id}"
     else:

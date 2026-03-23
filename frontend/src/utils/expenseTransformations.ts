@@ -132,7 +132,7 @@ export const extractItemizedDataFromExpense = (
         price: item.price,
         is_tax_tip: false,
         assignments: item.assignments.map(a => {
-            if (a.expense_guest_id !== undefined) {
+            if (a.expense_guest_id != null) {
                 return {
                     user_id: a.expense_guest_id,
                     is_guest: false,

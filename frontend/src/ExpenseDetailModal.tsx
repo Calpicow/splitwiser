@@ -19,12 +19,17 @@ import {
     getParticipantName as getParticipantNameUtil
 } from './utils/participantHelpers';
 import {
-    calculateEqualSplit,
-    calculateExactSplit,
-    calculatePercentSplit,
-    calculateSharesSplit,
     calculateItemizedTotal
 } from './utils/expenseCalculations';
+import {
+    extractParticipantKeysFromExpense,
+    extractSplitDetailsFromExpense,
+    extractItemizedDataFromExpense,
+    assembleItemizedPayload,
+    assembleSplitsPayload,
+    amountToCents,
+    centsToDisplayAmount,
+} from './utils/expenseTransformations';
 import { formatMoney, formatDate } from './utils/formatters';
 import { CURRENCIES } from './utils/currencyHelpers';
 import { expensesApi } from './services/api';
@@ -164,7 +169,7 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
     const populateFormFromExpense = (exp: ExpenseWithSplits) => {
         setDescription(exp.description);
-        setAmount((exp.amount / 100).toFixed(2));
+        setAmount(centsToDisplayAmount(exp.amount));
         setCurrency(exp.currency);
         setExpenseDate(exp.date.split('T')[0]);
         setPayerId(exp.payer_id);
@@ -175,43 +180,11 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         setIsSettlement(exp.is_settlement || false);
 
         // Set selected participants from splits
-        const keys = exp.splits.map(s => {
-            // Check if this is an expense guest by matching with expense_guests array
-            if (exp.expense_guests) {
-                const isExpenseGuest = exp.expense_guests.some(eg => eg.id === s.user_id && !s.is_guest);
-                if (isExpenseGuest) {
-                    return `expenseguest_${s.user_id}`;
-                }
-            }
-            return s.is_guest ? `guest_${s.user_id}` : `user_${s.user_id}`;
-        });
-        setSelectedParticipantKeys(keys);
+        setSelectedParticipantKeys(extractParticipantKeysFromExpense(exp));
 
         // Set split details for non-EQUAL types
-        if (exp.split_type !== 'EQUAL' && exp.split_type !== 'ITEMIZED') {
-            const details: { [key: string]: number } = {};
-            exp.splits.forEach(s => {
-                // Check if this is an expense guest
-                let key: string;
-                if (exp.expense_guests) {
-                    const isExpenseGuest = exp.expense_guests.some(eg => eg.id === s.user_id && !s.is_guest);
-                    if (isExpenseGuest) {
-                        key = `expenseguest_${s.user_id}`;
-                    } else {
-                        key = s.is_guest ? `guest_${s.user_id}` : `user_${s.user_id}`;
-                    }
-                } else {
-                    key = s.is_guest ? `guest_${s.user_id}` : `user_${s.user_id}`;
-                }
-
-                if (exp.split_type === 'PERCENT' && s.percentage !== null) {
-                    details[key] = s.percentage;
-                } else if (exp.split_type === 'SHARES' && s.shares !== null) {
-                    details[key] = s.shares;
-                } else if (exp.split_type === 'EXACT') {
-                    details[key] = s.amount_owed / 100;
-                }
-            });
+        const details = extractSplitDetailsFromExpense(exp);
+        if (Object.keys(details).length > 0) {
             setSplitDetails(details);
         } else {
             setSplitDetails({});
@@ -219,42 +192,10 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
         // Handle ITEMIZED expenses
         if (exp.split_type === 'ITEMIZED' && exp.items) {
-            const regularItems = exp.items.filter(i => !i.is_tax_tip);
-            const taxTipItems = exp.items.filter(i => i.is_tax_tip);
-
-            const editableItems = regularItems.map(item => ({
-                description: item.description,
-                price: item.price,
-                is_tax_tip: false,
-                assignments: item.assignments.map(a => {
-                    // For expense guests, use expense_guest_id as the user_id
-                    if (a.expense_guest_id !== undefined) {
-                        return {
-                            user_id: a.expense_guest_id,
-                            is_guest: false,
-                            expense_guest_id: a.expense_guest_id
-                        };
-                    }
-                    return {
-                        user_id: a.user_id,
-                        is_guest: a.is_guest
-                    };
-                })
-            }));
-
-            itemizedExpense.setItems(editableItems);
-
-            // Separate Tax and Tip amounts from existing data
-            // For backward compatibility, if there's an old "Tax/Tip" item, put it all in tax
-            const taxItems = taxTipItems.filter(i => i.description.toLowerCase().includes('tax') && !i.description.toLowerCase().includes('tip'));
-            const tipItems = taxTipItems.filter(i => i.description.toLowerCase().includes('tip') && !i.description.toLowerCase().includes('tax'));
-            const combinedItems = taxTipItems.filter(i => i.description.toLowerCase() === 'tax/tip');
-
-            const taxTotal = taxItems.reduce((sum, item) => sum + item.price, 0) + combinedItems.reduce((sum, item) => sum + item.price, 0);
-            const tipTotal = tipItems.reduce((sum, item) => sum + item.price, 0);
-
-            itemizedExpense.setTaxAmount(taxTotal > 0 ? (taxTotal / 100).toFixed(2) : '');
-            itemizedExpense.setTipAmount(tipTotal > 0 ? (tipTotal / 100).toFixed(2) : '');
+            const itemizedData = extractItemizedDataFromExpense(exp.items);
+            itemizedExpense.setItems(itemizedData.items);
+            itemizedExpense.setTaxAmount(itemizedData.taxAmount);
+            itemizedExpense.setTipAmount(itemizedData.tipAmount);
         } else {
             itemizedExpense.setItems([]);
             itemizedExpense.setTaxAmount('');
@@ -415,51 +356,19 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
     };
 
     const handleSave = async () => {
-        const totalAmountCents = Math.round(parseFloat(amount) * 100);
+        const totalAmountCents = amountToCents(amount);
         const allParticipants = getAllParticipants();
-        // Filter out expense guests from splits (they're handled separately on backend)
-        const participants = allParticipants.filter(p => !p.isExpenseGuest);
-        let splits: any[] = [];
 
-        // Calculate splits based on type
-        if (splitType === 'EQUAL') {
-            splits = calculateEqualSplit(totalAmountCents, participants);
-        } else if (splitType === 'EXACT') {
-            const result = calculateExactSplit(totalAmountCents, participants, splitDetails);
-            if (result.error) {
-                setAlertDialog({
-                    isOpen: true,
-                    title: 'Invalid Split',
-                    message: result.error,
-                    type: 'error'
-                });
-                return;
-            }
-            splits = result.splits;
-        } else if (splitType === 'PERCENT') {
-            const result = calculatePercentSplit(totalAmountCents, participants, splitDetails);
-            if (result.error) {
-                setAlertDialog({
-                    isOpen: true,
-                    title: 'Invalid Split',
-                    message: result.error,
-                    type: 'error'
-                });
-                return;
-            }
-            splits = result.splits;
-        } else if (splitType === 'SHARES') {
-            const result = calculateSharesSplit(totalAmountCents, participants, splitDetails);
-            if (result.error) {
-                setAlertDialog({
-                    isOpen: true,
-                    title: 'Invalid Split',
-                    message: result.error,
-                    type: 'error'
-                });
-                return;
-            }
-            splits = result.splits;
+        // Calculate splits (assembleSplitsPayload filters out expense guests internally)
+        const splitResult = assembleSplitsPayload(splitType, allParticipants, splitDetails, totalAmountCents);
+        if (splitResult.error) {
+            setAlertDialog({
+                isOpen: true,
+                title: 'Invalid Split',
+                message: splitResult.error,
+                type: 'error'
+            });
+            return;
         }
 
         const payload: any = {
@@ -469,7 +378,7 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             date: expenseDate,
             payer_id: payerId,
             payer_is_guest: payerIsGuest,
-            splits,
+            splits: splitResult.splits,
             split_type: splitType,
             icon: selectedIcon,
             notes,
@@ -479,42 +388,11 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         if (splitType === 'ITEMIZED') {
             setIsSubmitting(true);
             try {
-                const allItems = [...itemizedExpense.itemizedItems];
-                const tax = Math.round(parseFloat(itemizedExpense.taxAmount || '0') * 100);
-                const tip = Math.round(parseFloat(itemizedExpense.tipAmount || '0') * 100);
-
-                // Add Tax as a separate item if present
-                if (tax > 0) {
-                    allItems.push({
-                        description: 'Tax',
-                        price: tax,
-                        is_tax_tip: true,
-                        assignments: []
-                    });
-                }
-
-                // Add Tip as a separate item if present
-                if (tip > 0) {
-                    allItems.push({
-                        description: 'Tip',
-                        price: tip,
-                        is_tax_tip: true,
-                        assignments: []
-                    });
-                }
-
-                const itemsTotal = allItems.reduce((sum, item) => sum + item.price, 0);
-
-                // Include all selected participants as splits (backend will merge with calculated amounts)
-                // For expense guests, only include them in splits if they're NOT expense guests
-                // (expense guests are handled separately on the backend)
-                const participantSplits = getAllParticipants()
-                    .filter(p => !p.isExpenseGuest)
-                    .map(p => ({
-                        user_id: p.id,
-                        is_guest: p.isGuest,
-                        amount_owed: 0
-                    }));
+                const { items: allItems, totalCents: itemsTotal } = assembleItemizedPayload(
+                    itemizedExpense.itemizedItems,
+                    itemizedExpense.taxAmount,
+                    itemizedExpense.tipAmount,
+                );
 
                 const itemizedPayload: any = {
                     description,
@@ -525,7 +403,7 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                     payer_is_guest: payerIsGuest,
                     split_type: 'ITEMIZED',
                     items: allItems,
-                    splits: participantSplits,
+                    splits: splitResult.splits,
                     icon: selectedIcon,
                     notes,
                     is_settlement: isSettlement

@@ -524,6 +524,11 @@ def update_expense(
         if expense.created_by_id != current_user.id:
             raise HTTPException(status_code=403, detail="Only the expense creator can edit this expense")
 
+    # Initialize expense guest amounts (will be populated by itemized calculation if needed)
+    expense_guest_amounts = {}
+    # Mapping from temp_id to existing ExpenseGuest DB records (for updates with expense guests)
+    temp_id_to_expense_guest = {}
+
     # Handle ITEMIZED split type
     if expense_update.split_type == "ITEMIZED":
         if not expense_update.items:
@@ -535,8 +540,31 @@ def update_expense(
             for s in (expense_update.splits or [])
         }
 
-        # Calculate splits from items (unassigned items will not be included in splits)
-        calculated_splits = calculate_itemized_splits(expense_update.items)
+        # Check if any items have expense guest assignments or if expense has existing expense guests
+        has_expense_guests = any(
+            a.temp_guest_id for item in expense_update.items for a in item.assignments
+        )
+        existing_expense_guests = db.query(models.ExpenseGuest).filter(
+            models.ExpenseGuest.expense_id == expense_id
+        ).all()
+
+        if has_expense_guests or existing_expense_guests:
+            # Build a mapping from temp_id to existing expense guest DB records
+            # by matching names from the update payload to existing DB records
+            temp_id_to_expense_guest = {}
+            if expense_update.expense_guests:
+                eg_by_name = {eg.name: eg for eg in existing_expense_guests}
+                for guest_data in expense_update.expense_guests:
+                    matched_eg = eg_by_name.get(guest_data.name)
+                    if matched_eg:
+                        temp_id_to_expense_guest[guest_data.temp_id] = matched_eg
+
+            # Use the function that handles expense guests
+            calculated_splits, expense_guest_amounts = calculate_itemized_splits_with_expense_guests(expense_update.items)
+        else:
+            # Use the original function
+            calculated_splits = calculate_itemized_splits(expense_update.items)
+
         calculated_keys = {
             f"{'guest' if s.is_guest else 'user'}_{s.user_id}"
             for s in calculated_splits
@@ -558,12 +586,14 @@ def update_expense(
 
     # Validate total amount vs splits
     total_split = sum(split.amount_owed for split in expense_update.splits)
+    total_expense_guest = sum(expense_guest_amounts.values())
+    total_all_participants = total_split + total_expense_guest
     # For itemized expenses, allow splits to be less than total (unassigned items absorbed by payer)
     if expense_update.split_type == "ITEMIZED":
-        if total_split > expense_update.amount:
+        if total_all_participants > expense_update.amount:
             raise HTTPException(
                 status_code=400,
-                detail=f"Split amounts exceed total expense amount. Total: {expense_update.amount}, Sum: {total_split}"
+                detail=f"Split amounts exceed total expense amount. Total: {expense_update.amount}, Sum: {total_all_participants}"
             )
     else:
         if abs(total_split - expense_update.amount) > 1:
@@ -573,12 +603,14 @@ def update_expense(
             )
 
     # Validate all participants exist and are authorized
+    # Skip expense guest validation since they use temp_guest_id references
     validate_expense_participants(
         db=db,
         payer_id=expense_update.payer_id,
         payer_is_guest=expense_update.payer_is_guest,
         splits=expense_update.splits,
         items=expense_update.items if expense_update.split_type == "ITEMIZED" else None,
+        skip_expense_guest_validation=bool(temp_id_to_expense_guest),
         group_id=expense.group_id,
         current_user_id=current_user.id
     )
@@ -636,6 +668,25 @@ def update_expense(
         )
         db.add(db_split)
 
+    # Update expense guest amounts from itemized calculation
+    if expense_guest_amounts:
+        for temp_id, amount in expense_guest_amounts.items():
+            # First check the temp_id mapping
+            if temp_id in temp_id_to_expense_guest:
+                temp_id_to_expense_guest[temp_id].amount_owed = amount
+            else:
+                # Fall back to looking up by stringified DB ID
+                try:
+                    eg_id = int(temp_id)
+                    eg = db.query(models.ExpenseGuest).filter(
+                        models.ExpenseGuest.expense_id == expense_id,
+                        models.ExpenseGuest.id == eg_id
+                    ).first()
+                    if eg:
+                        eg.amount_owed = amount
+                except (ValueError, TypeError):
+                    pass
+
     # Create new items if ITEMIZED
     if expense_update.split_type == "ITEMIZED" and expense_update.items:
         for item in expense_update.items:
@@ -667,11 +718,25 @@ def update_expense(
             for assignment in item.assignments:
                 # Check if this is an expense guest assignment
                 if hasattr(assignment, 'temp_guest_id') and assignment.temp_guest_id:
-                    # Look up the actual expense guest by temp_id (for new assignments)
-                    expense_guest = db.query(models.ExpenseGuest).filter(
-                        models.ExpenseGuest.expense_id == expense_id,
-                        models.ExpenseGuest.name == assignment.temp_guest_id  # temp_guest_id might contain name
-                    ).first()
+                    # Look up the actual expense guest
+                    expense_guest = None
+                    # First check the temp_id mapping (built from expense_guests in update payload)
+                    if assignment.temp_guest_id in temp_id_to_expense_guest:
+                        expense_guest = temp_id_to_expense_guest[assignment.temp_guest_id]
+                    else:
+                        # Try to parse as integer ID (for updates where temp_guest_id is stringified DB ID)
+                        try:
+                            eg_id = int(assignment.temp_guest_id)
+                            expense_guest = db.query(models.ExpenseGuest).filter(
+                                models.ExpenseGuest.expense_id == expense_id,
+                                models.ExpenseGuest.id == eg_id
+                            ).first()
+                        except (ValueError, TypeError):
+                            # Fall back to name-based lookup for backwards compatibility
+                            expense_guest = db.query(models.ExpenseGuest).filter(
+                                models.ExpenseGuest.expense_id == expense_id,
+                                models.ExpenseGuest.name == assignment.temp_guest_id
+                            ).first()
                     if expense_guest:
                         db_assignment = models.ExpenseItemAssignment(
                             expense_item_id=db_item.id,

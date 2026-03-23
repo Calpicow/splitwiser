@@ -932,7 +932,6 @@ def _create_friendship(db_session, user_id1, user_id2):
 # 19. Update ITEMIZED expense with expense guests — recalculate amounts
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="Known bug: update uses calculate_itemized_splits() instead of calculate_itemized_splits_with_expense_guests(), and never updates ExpenseGuest.amount_owed")
 def test_update_itemized_expense_with_expense_guests(client, auth_headers, db_session, test_user):
     """Create a non-group itemized expense with expense guests, update items,
     and verify that expense guest amounts are correctly recalculated."""
@@ -989,7 +988,8 @@ def test_update_itemized_expense_with_expense_guests(client, auth_headers, db_se
     guest_db_id = initial_guest["id"]
 
     # Update: change Salad price to 1200, reassign Soup to the expense guest too
-    # Use the expense guest's DB id in user_id (the way frontend sends existing expense guests)
+    # Use temp_guest_id to reference expense guests (avoids ambiguity when expense guest
+    # IDs overlap with user IDs since they come from separate DB tables)
     update_payload = {
         "description": "Dinner with guest (updated)",
         "amount": 3800,  # will be recalculated from items
@@ -1016,13 +1016,13 @@ def test_update_itemized_expense_with_expense_guests(client, auth_headers, db_se
                 "description": "Salad",
                 "price": 1200,
                 "is_tax_tip": False,
-                "assignments": [{"user_id": guest_db_id, "is_guest": False}],
+                "assignments": [{"temp_guest_id": "g1"}],
             },
             {
                 "description": "Soup",
                 "price": 600,
                 "is_tax_tip": False,
-                "assignments": [{"user_id": guest_db_id, "is_guest": False}],
+                "assignments": [{"temp_guest_id": "g1"}],
             },
         ],
     }
@@ -1050,7 +1050,6 @@ def test_update_itemized_expense_with_expense_guests(client, auth_headers, db_se
 # 20. Update ITEMIZED expense — expense guest assignments preserved
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="Known bug: expense guest lookup matches by name instead of ID, causing assignments to be silently lost")
 def test_update_itemized_expense_guest_assignments_preserved(client, auth_headers, db_session, test_user):
     """Create a non-group itemized expense with expense guest item assignments.
     Update the expense (change a description/price). Verify expense guest item

@@ -711,7 +711,7 @@ def update_expense(
                 split_details=split_details_json
             )
             db.add(db_item)
-            db.commit()
+            db.flush()
             db.refresh(db_item)
 
             # Store assignments
@@ -741,11 +741,7 @@ def update_expense(
                                 models.ExpenseGuest.id == eg_id
                             ).first()
                         except (ValueError, TypeError):
-                            # Fall back to name-based lookup for backwards compatibility
-                            expense_guest = db.query(models.ExpenseGuest).filter(
-                                models.ExpenseGuest.expense_id == expense_id,
-                                models.ExpenseGuest.name == assignment.temp_guest_id
-                            ).first()
+                            pass
                     if expense_guest:
                         db_assignment = models.ExpenseItemAssignment(
                             expense_item_id=db_item.id,

@@ -282,6 +282,25 @@ describe('extractItemizedDataFromExpense', () => {
         expect(result.items[0].assignments[1]).toEqual({ user_id: 50, is_guest: false, expense_guest_id: 50 });
     });
 
+    it('preserves user_id when expense_guest_id is null', () => {
+        const items: ExpenseItemDetail[] = [
+            makeItemDetail({
+                description: 'Pasta',
+                price: 1400,
+                is_tax_tip: false,
+                assignments: [
+                    { user_id: 7, is_guest: false, user_name: 'Charlie', expense_guest_id: null },
+                ],
+            }),
+        ];
+        const result = extractItemizedDataFromExpense(items);
+        expect(result.items[0].assignments).toHaveLength(1);
+        // expense_guest_id: null should NOT cause user_id to become null
+        expect(result.items[0].assignments[0].user_id).toBe(7);
+        expect(result.items[0].assignments[0].is_guest).toBe(false);
+        expect(result.items[0].assignments[0]).not.toHaveProperty('expense_guest_id');
+    });
+
     it('converts item prices from cents to cents (preserves)', () => {
         const items: ExpenseItemDetail[] = [
             makeItemDetail({ description: 'Wine', price: 1500, is_tax_tip: false }),

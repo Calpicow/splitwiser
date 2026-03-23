@@ -22,12 +22,13 @@ import {
     getParticipantName as getParticipantNameUtil
 } from './utils/participantHelpers';
 import {
-    calculateEqualSplit,
-    calculateExactSplit,
-    calculatePercentSplit,
-    calculateSharesSplit,
     calculateItemizedTotal
 } from './utils/expenseCalculations';
+import {
+    assembleItemizedPayload,
+    assembleSplitsPayload,
+    amountToCents,
+} from './utils/expenseTransformations';
 import { formatDateForInput } from './utils/formatters';
 import { formatCurrencyDisplay } from './utils/currencyHelpers';
 import { offlineExpensesApi } from './services/offlineApi';
@@ -269,53 +270,20 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const totalAmountCents = Math.round(parseFloat(amount) * 100);
+        const totalAmountCents = amountToCents(amount);
         const participants = getAllParticipants();
-        let splits: any[] = [];
 
-        // Calculate splits based on type
-        if (splitType === 'EQUAL') {
-            splits = calculateEqualSplit(totalAmountCents, participants);
-        } else if (splitType === 'EXACT') {
-            const result = calculateExactSplit(totalAmountCents, participants, splitDetails);
-            if (result.error) {
-                setAlertDialog({
-                    isOpen: true,
-                    title: 'Invalid Split',
-                    message: result.error,
-                    type: 'error'
-                });
-                return;
-            }
-            splits = result.splits;
-        } else if (splitType === 'PERCENT') {
-            const result = calculatePercentSplit(totalAmountCents, participants, splitDetails);
-            if (result.error) {
-                setAlertDialog({
-                    isOpen: true,
-                    title: 'Invalid Split',
-                    message: result.error,
-                    type: 'error'
-                });
-                return;
-            }
-            splits = result.splits;
-        } else if (splitType === 'SHARES') {
-            const result = calculateSharesSplit(totalAmountCents, participants, splitDetails);
-            if (result.error) {
-                setAlertDialog({
-                    isOpen: true,
-                    title: 'Invalid Split',
-                    message: result.error,
-                    type: 'error'
-                });
-                return;
-            }
-            splits = result.splits;
+        // Calculate splits (assembleSplitsPayload filters out expense guests internally)
+        const splitResult = assembleSplitsPayload(splitType, participants, splitDetails, totalAmountCents);
+        if (splitResult.error) {
+            setAlertDialog({
+                isOpen: true,
+                title: 'Invalid Split',
+                message: splitResult.error,
+                type: 'error'
+            });
+            return;
         }
-
-        // Filter out expense guests from splits (they're handled separately)
-        const regularSplits = splits.filter((s: any) => !s.isExpenseGuest);
 
         const payload: any = {
             description,
@@ -328,7 +296,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             payer_temp_guest_id: payerTempGuestId,
             group_id: selectedGroupId,
             split_type: splitType,
-            splits: regularSplits,
+            splits: splitResult.splits,
             icon: selectedIcon,
             receipt_image_path: receiptImagePath,
             notes: notes,
@@ -341,45 +309,11 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         }
 
         if (splitType === 'ITEMIZED') {
-            // Build items array with tax and tip
-            const allItems = [...itemizedExpense.itemizedItems];
-            const tax = Math.round(parseFloat(itemizedExpense.taxAmount || '0') * 100);
-            const tip = Math.round(parseFloat(itemizedExpense.tipAmount || '0') * 100);
-
-            // Add Tax as a separate item if present
-            if (tax > 0) {
-                allItems.push({
-                    description: 'Tax',
-                    price: tax,
-                    is_tax_tip: true,
-                    assignments: [],
-                    split_type: 'EQUAL',
-                    split_details: undefined
-                });
-            }
-
-            // Add Tip as a separate item if present
-            if (tip > 0) {
-                allItems.push({
-                    description: 'Tip',
-                    price: tip,
-                    is_tax_tip: true,
-                    assignments: [],
-                    split_type: 'EQUAL',
-                    split_details: undefined
-                });
-            }
-
-            const itemsTotal = allItems.reduce((sum, item) => sum + item.price, 0);
-
-            // Include all selected participants as splits (excluding expense guests - they're handled separately)
-            const participantSplits = getAllParticipants()
-                .filter(p => !p.isExpenseGuest)
-                .map(p => ({
-                    user_id: p.id,
-                    is_guest: p.isGuest,
-                    amount_owed: 0
-                }));
+            const { items: allItems, totalCents: itemsTotal } = assembleItemizedPayload(
+                itemizedExpense.itemizedItems,
+                itemizedExpense.taxAmount,
+                itemizedExpense.tipAmount,
+            );
 
             const itemizedPayload: any = {
                 description,
@@ -393,7 +327,7 @@ const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 group_id: selectedGroupId,
                 split_type: 'ITEMIZED',
                 items: allItems,
-                splits: participantSplits,
+                splits: splitResult.splits,
                 icon: selectedIcon,
                 receipt_image_path: receiptImagePath,
                 notes: notes,

@@ -18,5 +18,6 @@ backend/data/
 secrets/
 .pytest_cache/
 .claude/
+.agents/reviews/
 data/
 credentials.json

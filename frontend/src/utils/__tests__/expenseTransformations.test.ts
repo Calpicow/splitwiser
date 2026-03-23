@@ -6,7 +6,6 @@ import type {
     ExpenseWithSplits,
     ExpenseItemDetail,
     ExpenseSplit,
-    ExpenseGuest,
 } from '../../types/expense';
 import {
     parseParticipantKey,
@@ -289,7 +288,7 @@ describe('extractItemizedDataFromExpense', () => {
                 price: 1400,
                 is_tax_tip: false,
                 assignments: [
-                    { user_id: 7, is_guest: false, user_name: 'Charlie', expense_guest_id: null },
+                    { user_id: 7, is_guest: false, user_name: 'Charlie', expense_guest_id: null as unknown as undefined },
                 ],
             }),
         ];

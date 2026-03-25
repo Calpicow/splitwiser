@@ -12,6 +12,7 @@ primary_region = 'sjc'
   VITE_GOOGLE_CLIENT_ID = "411308177468-dhc3vp78shfq5efb5nnrne56kl8a9iob.apps.googleusercontent.com"
 
 [env]
+  CLIENT_URL = "https://splitwiser.onlyslop.dev"
   DATABASE_PATH = "/data/db.sqlite3"
   DATA_DIR = "/data"
   # Google OAuth client ID for backend verification

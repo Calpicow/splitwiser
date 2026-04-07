@@ -222,7 +222,7 @@ export const assembleItemizedPayload = (
 export const assembleSplitsPayload = (
     splitType: string,
     participants: Participant[],
-    splitDetails: Record<string, number>,
+    splitDetails: Record<string, string | number>,
     totalAmountCents: number,
 ): { splits: SplitResult[]; error?: string } => {
     // Filter out expense guests — they're handled separately on the backend

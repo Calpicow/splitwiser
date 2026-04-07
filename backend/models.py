@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric
 from database import Base
 from datetime import datetime
 
@@ -88,7 +88,7 @@ class ExpenseSplit(Base):
     is_guest = Column(Boolean, default=False)
     amount_owed = Column(Integer) # The amount this user owes
     percentage = Column(Integer, nullable=True) # For percentage splits
-    shares = Column(Integer, nullable=True) # For share splits
+    shares = Column(Numeric(10, 2), nullable=True) # For share splits
 
 class ExpenseItem(Base):
     __tablename__ = "expense_items"

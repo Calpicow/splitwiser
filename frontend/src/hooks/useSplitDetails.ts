@@ -1,10 +1,10 @@
 import { useState } from 'react';
 
 export const useSplitDetails = () => {
-    const [splitDetails, setSplitDetails] = useState<{ [key: string]: number }>({});
+    const [splitDetails, setSplitDetails] = useState<{ [key: string]: string | number }>({});
 
     const handleSplitDetailChange = (key: string, value: string) => {
-        setSplitDetails(prev => ({ ...prev, [key]: parseFloat(value) || 0 }));
+        setSplitDetails(prev => ({ ...prev, [key]: value }));
     };
 
     const removeSplitDetail = (key: string) => {

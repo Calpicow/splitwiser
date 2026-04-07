@@ -31,7 +31,7 @@ export const calculateEqualSplit = (
 export const calculateExactSplit = (
     totalAmountCents: number,
     participants: Participant[],
-    splitDetails: { [key: string]: number }
+    splitDetails: { [key: string]: string | number }
 ): { splits: SplitResult[]; error?: string } => {
     const splits = participants.map(p => {
         const key = p.isGuest ? `guest_${p.id}` : `user_${p.id}`;
@@ -59,7 +59,7 @@ export const calculateExactSplit = (
 export const calculatePercentSplit = (
     totalAmountCents: number,
     participants: Participant[],
-    splitDetails: { [key: string]: number }
+    splitDetails: { [key: string]: string | number }
 ): { splits: SplitResult[]; error?: string } => {
     const shares = participants.map(p => {
         const key = p.isGuest ? `guest_${p.id}` : `user_${p.id}`;
@@ -106,7 +106,7 @@ export const calculatePercentSplit = (
 export const calculateSharesSplit = (
     totalAmountCents: number,
     participants: Participant[],
-    splitDetails: { [key: string]: number }
+    splitDetails: { [key: string]: string | number }
 ): { splits: SplitResult[]; error?: string } => {
     const sharesMap = participants.map(p => {
         const key = p.isGuest ? `guest_${p.id}` : `user_${p.id}`;
@@ -131,7 +131,7 @@ export const calculateSharesSplit = (
                 user_id: s.participant.id,
                 is_guest: s.participant.isGuest,
                 amount_owed: totalAmountCents - runningTotal,
-                shares: Math.round(s.shares)
+                shares: s.shares
             };
         }
         const shareAmount = Math.round(totalAmountCents * (s.shares / totalShares));
@@ -140,7 +140,7 @@ export const calculateSharesSplit = (
             user_id: s.participant.id,
             is_guest: s.participant.isGuest,
             amount_owed: shareAmount,
-            shares: Math.round(s.shares)
+            shares: s.shares
         };
     });
 

@@ -5,7 +5,7 @@ import { getParticipantKey } from '../../utils/participantHelpers';
 interface SplitDetailsInputProps {
     splitType: 'EXACT' | 'PERCENT' | 'SHARES';
     participants: Participant[];
-    splitDetails: { [key: string]: number };
+    splitDetails: { [key: string]: string | number };
     onChange: (key: string, value: string) => void;
     currency: string;
     getParticipantName: (p: Participant) => string;
